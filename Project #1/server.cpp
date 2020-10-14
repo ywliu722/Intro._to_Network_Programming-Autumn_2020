@@ -78,13 +78,13 @@ void Register(int UDP_socket, char* buffer, struct sockaddr_in &client_info, sql
     string tmp = "";
     int result = sqlite3_exec(database, sql.c_str(), 0, 0, &zErrMsg);
     if( result != SQLITE_OK ){
+        fprintf(stderr, "SQL error: %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
         tmp = "F";
     }
     else{
         tmp = "S";
     }
-    cout<<"here"<<endl;
     // Convert the sting into char*
     int len = tmp.size();
     char send_buffer[len+1];
@@ -93,6 +93,7 @@ void Register(int UDP_socket, char* buffer, struct sockaddr_in &client_info, sql
 
     // Send the result back to the client
     sendto(UDP_socket, send_buffer, sizeof(send_buffer), 0, (struct sockaddr*)&client_info, sizeof(client_info));
+    cout<<"here"<<endl;
 }
 void Login(int newConnection, char* buffer, sqlite3 * database){
     int index=0;
@@ -130,23 +131,25 @@ void Login(int newConnection, char* buffer, sqlite3 * database){
         // 0: Success, 1: Fail
         if(strcmp(ret,pwd.c_str())==0){
             tmp="0 ";
-            srand( time(NULL) );
             int random_number = 0;
-            while(1){
+            //while(1){
+                srand( time(NULL) );
                 random_number = rand() % MAX_CLIENT;
-                string sql = "INSERT INTO LOGIN (Num,Username) VALUES ("
-                                    + quotesql(to_string(random_number)) + ", "
+                cout<<random_number<<endl;
+                string t=to_string(random_number);
+                string sql2 = "INSERT INTO LOGIN (Num,Username) VALUES ("
+                                    + quotesql(t) + ", "
                                     + quotesql(usr) + ");";
-                char *zErrMsg=0;
-                int result = sqlite3_exec(database, sql.c_str(), 0, 0, &zErrMsg);
-               if( database != SQLITE_OK ){
-                    fprintf(stderr, "SQL error: %s\n", zErrMsg);
-                    sqlite3_free(zErrMsg);
+                char *zErrMsg2=0;
+                int fd2 = sqlite3_exec(database, sql2.c_str(), 0, 0, &zErrMsg2);
+               if( fd2 != SQLITE_OK ){
+                    fprintf(stderr, "SQL error: %s\n", zErrMsg2);
+                    sqlite3_free(zErrMsg2);
                 }
-                else{
+                /*else{
                     break;
-                }
-            }
+                }*/
+            //}
             cout<<"here"<<endl;
             tmp+=to_string(random_number);
         }
