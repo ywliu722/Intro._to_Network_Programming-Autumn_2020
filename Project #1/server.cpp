@@ -13,6 +13,7 @@
 #define MAX_CLIENT 10
 
 using namespace std;
+sqlite3 * log;
 string quotesql( const string& s ) {
     return string("'") + s + string("'");
 }
@@ -20,6 +21,10 @@ sqlite3 * SQL_Initialization(){
     sqlite3 *db;
     char *zErrMsg = 0;
     int database = sqlite3_open("user.db", &db);
+    sqlite3_busy_timeout(db,5000);
+
+    database = sqlite3_open("online.db", &log);
+    sqlite3_busy_timeout(log,5000);
 
     string sql = "CREATE TABLE USERS("
                 "UID INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -30,7 +35,7 @@ sqlite3 * SQL_Initialization(){
     database = sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
 
     if( database != SQLITE_OK ){
-        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        //fprintf(stderr, "SQL error: %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
     }
 
@@ -39,10 +44,10 @@ sqlite3 * SQL_Initialization(){
                         "UID INTEGER PRIMARY KEY AUTOINCREMENT,"
                         "Num TEXT NOT NULL UNIQUE,"
                         "Username TEXT NOT NULL);";
-    database = sqlite3_exec(db, sql2.c_str(), 0, 0, &zErrMsg2);
+    database = sqlite3_exec(log, sql2.c_str(), 0, 0, &zErrMsg2);
     
     if( database != SQLITE_OK ){
-        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        //fprintf(stderr, "SQL error: %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
     }
     return db;
@@ -78,7 +83,7 @@ void Register(int UDP_socket, char* buffer, struct sockaddr_in &client_info, sql
     string tmp = "";
     int result = sqlite3_exec(database, sql.c_str(), 0, 0, &zErrMsg);
     if( result != SQLITE_OK ){
-        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        //fprintf(stderr, "SQL error: %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
         tmp = "F";
     }
@@ -93,7 +98,7 @@ void Register(int UDP_socket, char* buffer, struct sockaddr_in &client_info, sql
 
     // Send the result back to the client
     sendto(UDP_socket, send_buffer, sizeof(send_buffer), 0, (struct sockaddr*)&client_info, sizeof(client_info));
-    cout<<"here"<<endl;
+    //cout<<"here"<<endl;
 }
 void Login(int newConnection, char* buffer, sqlite3 * database){
     int index=0;
@@ -118,7 +123,7 @@ void Login(int newConnection, char* buffer, sqlite3 * database){
     string sql = "SELECT Password from USERS WHERE Username = ?";
     int fd = sqlite3_prepare_v2(database, sql.c_str(), -1, &Stmt, 0);
     if( fd != SQLITE_OK ){
-        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        //fprintf(stderr, "SQL error: %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
     } 
     else{
@@ -135,22 +140,23 @@ void Login(int newConnection, char* buffer, sqlite3 * database){
             //while(1){
                 srand( time(NULL) );
                 random_number = rand() % MAX_CLIENT;
-                cout<<random_number<<endl;
+                //cout<<random_number<<endl;
                 string t=to_string(random_number);
                 string sql2 = "INSERT INTO LOGIN (Num,Username) VALUES ("
                                     + quotesql(t) + ", "
                                     + quotesql(usr) + ");";
                 char *zErrMsg2=0;
-                int fd2 = sqlite3_exec(database, sql2.c_str(), 0, 0, &zErrMsg2);
+                int fd2 = sqlite3_exec(log, sql2.c_str(), 0, 0, &zErrMsg2);
                if( fd2 != SQLITE_OK ){
-                    fprintf(stderr, "SQL error: %s\n", zErrMsg2);
+                    /*cout<<"LOGIN"<<endl;
+                    fprintf(stderr, "SQL error: %s\n", zErrMsg2);*/
                     sqlite3_free(zErrMsg2);
                 }
                 /*else{
                     break;
                 }*/
             //}
-            cout<<"here"<<endl;
+            //cout<<"here"<<endl;
             tmp+=to_string(random_number);
         }
         else{
@@ -168,7 +174,7 @@ void Login(int newConnection, char* buffer, sqlite3 * database){
     strcpy(send_buffer, tmp.c_str());
     send(newConnection, send_buffer, strlen(send_buffer), 0);
 }
-void Logout(int newConnection, char* buffer, sqlite3 * database){
+void Logout(int newConnection, char* buffer){
     string tmp="Bye, ";
     int len = tmp.size();
     char back[len+1];
@@ -179,9 +185,9 @@ void Logout(int newConnection, char* buffer, sqlite3 * database){
     char *zErrMsg;
     sqlite3_stmt *Stmt;
     string sql = "SELECT Username from LOGIN WHERE Num = ?";
-    int fd = sqlite3_prepare_v2(database, sql.c_str(), -1, &Stmt, 0);
+    int fd = sqlite3_prepare_v2(log, sql.c_str(), -1, &Stmt, 0);
     if( fd != SQLITE_OK ){
-        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        //fprintf(stderr, "SQL error: %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
     } 
     else{
@@ -198,9 +204,9 @@ void Logout(int newConnection, char* buffer, sqlite3 * database){
     char *zErrMsg2;
     sqlite3_stmt *Stmt2;
     string sql2 = "DELETE from LOGIN WHERE Num = ?";
-    int fd2 = sqlite3_prepare_v2(database, sql.c_str(), -1, &Stmt, 0);
+    int fd2 = sqlite3_prepare_v2(log, sql.c_str(), -1, &Stmt, 0);
     if( fd2 != SQLITE_OK ){
-        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        //fprintf(stderr, "SQL error: %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
     } 
     else{
@@ -213,15 +219,15 @@ void Logout(int newConnection, char* buffer, sqlite3 * database){
     strcpy(send_buffer, back);
     send(newConnection, send_buffer, strlen(send_buffer), 0);
 }
-void Whoami(int UDP_socket, char* buffer, struct sockaddr_in &client_info, sqlite3 * database){
+void Whoami(int UDP_socket, char* buffer, struct sockaddr_in &client_info){
 
     int random_number = buffer[2]-'0';
     char *zErrMsg;
     sqlite3_stmt *Stmt;
     string sql = "SELECT Username from LOGIN WHERE Num = ?";
-    int fd = sqlite3_prepare_v2(database, sql.c_str(), -1, &Stmt, 0);
+    int fd = sqlite3_prepare_v2(log, sql.c_str(), -1, &Stmt, 0);
     if( fd != SQLITE_OK ){
-        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        //fprintf(stderr, "SQL error: %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
     } 
     else{
@@ -330,7 +336,7 @@ int main(int argc, char* argv[]){
                 if (FD_ISSET(newConnection, &rset)){
                     // Receive the TCP packet
                     recv(newConnection, buffer, 1024, 0);
-                    printf("Client(TCP): %s\n", buffer);
+                    //printf("Client(TCP): %s\n", buffer);
 
                     // Classify the message
                     switch(buffer[0]){
@@ -340,7 +346,7 @@ int main(int argc, char* argv[]){
                             break;
                         // Logout command
                         case '2':
-                            Logout(newConnection, buffer, database);
+                            Logout(newConnection, buffer);
                             break;
                         // List_User command
                         case '4':
@@ -362,7 +368,7 @@ int main(int argc, char* argv[]){
                 if (FD_ISSET(UDP_socket, &rset)){
                     // Receive the UDP packet
                     recvfrom(UDP_socket, buffer, sizeof(buffer), 0, (struct sockaddr*)&client_info, &client_size);
-                    cout<<"Client(UDP): "<<buffer<<endl;
+                    //cout<<"Client(UDP): "<<buffer<<endl;
                     
                     // Classify the message
                     switch(buffer[0]){
@@ -372,7 +378,7 @@ int main(int argc, char* argv[]){
                             break;
                         // Whoami command
                         case '3':
-                            Whoami(UDP_socket, buffer, client_info, database);
+                            Whoami(UDP_socket, buffer, client_info);
                             break;
                         default:
                             break;
@@ -382,7 +388,7 @@ int main(int argc, char* argv[]){
                     memset(&buffer, '\0', sizeof(buffer));
                 }
                 else{
-                    cout<<"WOW"<<endl;
+                    //cout<<"WOW"<<endl;
                 }
 			}
 		}
