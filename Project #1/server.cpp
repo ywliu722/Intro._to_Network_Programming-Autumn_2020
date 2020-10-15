@@ -13,18 +13,11 @@
 #define MAX_CLIENT 10
 
 using namespace std;
-sqlite3 * log;
 string quotesql( const string& s ) {
     return string("'") + s + string("'");
 }
-sqlite3 * SQL_Initialization(){
-    sqlite3 *db;
+void SQL_Initialization(sqlite3 * db, sqlite3 * log){
     char *zErrMsg = 0;
-    int database = sqlite3_open("user.db", &db);
-    sqlite3_busy_timeout(db,5000);
-
-    database = sqlite3_open("online.db", &log);
-    sqlite3_busy_timeout(log,5000);
 
     string sql = "CREATE TABLE USERS("
                 "UID INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -32,7 +25,7 @@ sqlite3 * SQL_Initialization(){
                 "Email TEXT NOT NULL,"
                 "Password TEXT NOT NULL );";
     
-    database = sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
+    int database = sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
 
     if( database != SQLITE_OK ){
         //fprintf(stderr, "SQL error: %s\n", zErrMsg);
@@ -47,12 +40,11 @@ sqlite3 * SQL_Initialization(){
     database = sqlite3_exec(log, sql2.c_str(), 0, 0, &zErrMsg2);
     
     if( database != SQLITE_OK ){
-        //fprintf(stderr, "SQL error: %s\n", zErrMsg);
-        sqlite3_free(zErrMsg);
+        //fprintf(stderr, "SQL error: %s\n", zErrMsg2);
+        sqlite3_free(zErrMsg2);
     }
-    return db;
 }
-void Register(int UDP_socket, char* buffer, struct sockaddr_in &client_info, sqlite3 * database){
+void Register(int UDP_socket, char* buffer, struct sockaddr_in &client_info, sqlite3 *database){
 
     int index=0;
     string usr="", email="", pwd="";
@@ -100,7 +92,7 @@ void Register(int UDP_socket, char* buffer, struct sockaddr_in &client_info, sql
     sendto(UDP_socket, send_buffer, sizeof(send_buffer), 0, (struct sockaddr*)&client_info, sizeof(client_info));
     //cout<<"here"<<endl;
 }
-void Login(int newConnection, char* buffer, sqlite3 * database){
+void Login(int newConnection, char* buffer, sqlite3 * database, sqlite3 * log){
     int index=0;
     string usr="", pwd="";
     string tmp="";
@@ -148,8 +140,8 @@ void Login(int newConnection, char* buffer, sqlite3 * database){
                 char *zErrMsg2=0;
                 int fd2 = sqlite3_exec(log, sql2.c_str(), 0, 0, &zErrMsg2);
                if( fd2 != SQLITE_OK ){
-                    /*cout<<"LOGIN"<<endl;
-                    fprintf(stderr, "SQL error: %s\n", zErrMsg2);*/
+                    //cout<<"LOGIN"<<endl;
+                    //fprintf(stderr, "SQL error: %s\n", zErrMsg2);
                     sqlite3_free(zErrMsg2);
                 }
                 /*else{
@@ -174,7 +166,7 @@ void Login(int newConnection, char* buffer, sqlite3 * database){
     strcpy(send_buffer, tmp.c_str());
     send(newConnection, send_buffer, strlen(send_buffer), 0);
 }
-void Logout(int newConnection, char* buffer){
+void Logout(int newConnection, char* buffer, sqlite3 * log){
     string tmp="Bye, ";
     int len = tmp.size();
     char back[len+1];
@@ -219,7 +211,7 @@ void Logout(int newConnection, char* buffer){
     strcpy(send_buffer, back);
     send(newConnection, send_buffer, strlen(send_buffer), 0);
 }
-void Whoami(int UDP_socket, char* buffer, struct sockaddr_in &client_info){
+void Whoami(int UDP_socket, char* buffer, struct sockaddr_in &client_info, sqlite3 * log){
 
     int random_number = buffer[2]-'0';
     char *zErrMsg;
@@ -267,9 +259,6 @@ int main(int argc, char* argv[]){
         return 0;
     }
     int server_port=atoi(argv[1]);
-    
-    // Initializing the database
-    sqlite3 * database = SQL_Initialization();
 
     // Create both TCP and UDP socket
     int TCP_socket = socket(AF_INET, SOCK_STREAM, 0);
@@ -326,6 +315,13 @@ int main(int argc, char* argv[]){
             fd_set rset;
             FD_ZERO(&rset);
             int maxfdp = max(newConnection, UDP_socket) + 1;
+            // Initializing the database
+            sqlite3 * database;
+            sqlite3_open_v2("user.db", &database, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_NOMUTEX, NULL);
+            sqlite3 * log;
+            sqlite3_open_v2("online.db", &log, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_NOMUTEX, NULL);
+            SQL_Initialization(database, log);
+
             while(1){
                 FD_SET(newConnection, &rset);
                 FD_SET(UDP_socket, &rset);
@@ -342,11 +338,11 @@ int main(int argc, char* argv[]){
                     switch(buffer[0]){
                         // Login command
                         case '1':
-                            Login(newConnection, buffer, database);
+                            Login(newConnection, buffer, database, log);
                             break;
                         // Logout command
                         case '2':
-                            Logout(newConnection, buffer);
+                            Logout(newConnection, buffer, log);
                             break;
                         // List_User command
                         case '4':
@@ -355,6 +351,8 @@ int main(int argc, char* argv[]){
                         // Exit command
                         case '5':
                             close(newConnection);
+                            sqlite3_close(database);
+                            sqlite3_close(log);
                             return 0;
                         default:
                             break;
@@ -378,7 +376,7 @@ int main(int argc, char* argv[]){
                             break;
                         // Whoami command
                         case '3':
-                            Whoami(UDP_socket, buffer, client_info);
+                            Whoami(UDP_socket, buffer, client_info, log);
                             break;
                         default:
                             break;
@@ -395,7 +393,6 @@ int main(int argc, char* argv[]){
     }
     close(newConnection);
     close(UDP_socket);
-    sqlite3_close(database);
 
     return 0;
 }
