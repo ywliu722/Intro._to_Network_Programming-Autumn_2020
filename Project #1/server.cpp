@@ -31,12 +31,11 @@ void SQL_Initialization(sqlite3 * db){
     int database = sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
 
     if( database != SQLITE_OK ){
-        fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        //fprintf(stderr, "SQL error: %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
     }
 }
 void Register(int UDP_socket, char* buffer, struct sockaddr_in &client_info, sqlite3 *database){
-
     int index=0;
     string usr="", email="", pwd="";
     for(int i=2;i<strlen(buffer);i++){
@@ -81,7 +80,6 @@ void Register(int UDP_socket, char* buffer, struct sockaddr_in &client_info, sql
 
     // Send the result back to the client
     sendto(UDP_socket, send_buffer, sizeof(send_buffer), 0, (struct sockaddr*)&client_info, sizeof(client_info));
-    //cout<<"here"<<endl;
 }
 void Login(int newConnection, char* buffer, sqlite3 * database){
     int index=0;
@@ -162,9 +160,6 @@ void Logout(int newConnection, char* buffer){
 }
 void Whoami(int UDP_socket, char* buffer, struct sockaddr_in &client_info){
     string back="";
-    for(int i=0;i<MAX_CLIENT;i++){
-        cout<<ClientTable[i]<<endl;
-    }
     int random_number = buffer[2]-'0';
     back += ClientTable[random_number];
     // Convert the sting into char*
@@ -201,7 +196,7 @@ void *TCP_connection(void *parameter){
 
     while(1){
         recv(newConnection, buffer, 1024, 0);
-        printf("Client(TCP): %s\n", buffer);
+        //printf("Client(TCP): %s\n", buffer);
 
         // Classify the message
         switch(buffer[0]){
@@ -220,7 +215,6 @@ void *TCP_connection(void *parameter){
             // Exit command
             case '5':
                 close(newConnection);
-                sqlite3_close(database);
                 pthread_exit(0);
             default:
                 break;
@@ -229,7 +223,6 @@ void *TCP_connection(void *parameter){
 		memset(&buffer, '\0', sizeof(buffer));
     }
 }
-
 int main(int argc, char* argv[]){
     if(argc!=2){
         cout<<"Usage: ./server <server port>"<<endl;
@@ -310,7 +303,7 @@ int main(int argc, char* argv[]){
         if (FD_ISSET(UDP_socket, &rset)){
             // Receive the UDP packet
             recvfrom(UDP_socket, buffer, sizeof(buffer), 0, (struct sockaddr*)&client_info, &client_size);
-            cout<<"Client(UDP): "<<buffer<<endl;
+            //cout<<"Client(UDP): "<<buffer<<endl;
             // Classify the message
             switch(buffer[0]){
                 // Register command
