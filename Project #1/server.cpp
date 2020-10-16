@@ -31,7 +31,7 @@ void SQL_Initialization(sqlite3 * db){
     int database = sqlite3_exec(db, sql.c_str(), 0, 0, &zErrMsg);
 
     if( database != SQLITE_OK ){
-        //fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        fprintf(stderr, "SQL error: %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
     }
 }
@@ -66,7 +66,7 @@ void Register(int UDP_socket, char* buffer, struct sockaddr_in &client_info, sql
     string tmp = "";
     int result = sqlite3_exec(database, sql.c_str(), 0, 0, &zErrMsg);
     if( result != SQLITE_OK ){
-        //fprintf(stderr, "SQL error: %s\n", zErrMsg);
+        fprintf(stderr, "SQL error: %s\n", zErrMsg);
         sqlite3_free(zErrMsg);
         tmp = "F";
     }
@@ -162,6 +162,9 @@ void Logout(int newConnection, char* buffer){
 }
 void Whoami(int UDP_socket, char* buffer, struct sockaddr_in &client_info){
     string back="";
+    for(int i=0;i<MAX_CLIENT;i++){
+        cout<<ClientTable[i]<<endl;
+    }
     int random_number = buffer[2]-'0';
     back += ClientTable[random_number];
     // Convert the sting into char*
@@ -198,7 +201,7 @@ void *TCP_connection(void *parameter){
 
     while(1){
         recv(newConnection, buffer, 1024, 0);
-        //printf("Client(TCP): %s\n", buffer);
+        printf("Client(TCP): %s\n", buffer);
 
         // Classify the message
         switch(buffer[0]){
@@ -226,6 +229,7 @@ void *TCP_connection(void *parameter){
 		memset(&buffer, '\0', sizeof(buffer));
     }
 }
+
 int main(int argc, char* argv[]){
     if(argc!=2){
         cout<<"Usage: ./server <server port>"<<endl;
@@ -273,10 +277,7 @@ int main(int argc, char* argv[]){
     }
 
     // TCP waiting for connection
-    if(listen(TCP_socket, 10) == 0){
-		//cout<<"Listening"<<endl;
-	}
-    else{
+    if(listen(TCP_socket, 10) != 0){
 		cout<<"TCP binding error!"<<endl;
 	}
 
@@ -286,51 +287,47 @@ int main(int argc, char* argv[]){
     char buffer[1024];                                         // Buffer for receiving the message
     memset(&buffer, '\0', sizeof(buffer));  // Initializing the buffer
 
-    while(1){
-        // Initializing the select function
-        fd_set rset;
-        FD_ZERO(&rset);
-        int maxfdp = max(TCP_socket, UDP_socket) + 1;
+    // Initializing the select function
+    fd_set rset;
+     FD_ZERO(&rset);
+    int maxfdp = max(TCP_socket, UDP_socket) + 1;
             
-        while(1){
-            FD_SET(TCP_socket, &rset);
-            FD_SET(UDP_socket, &rset);
-            //cout<<"receiving2"<<endl;
-            int rec = select(maxfdp, &rset, NULL, NULL, NULL);
+    while(1){
+        FD_SET(TCP_socket, &rset);
+        FD_SET(UDP_socket, &rset);
+        //cout<<"receiving2"<<endl;
+        int rec = select(maxfdp, &rset, NULL, NULL, NULL);
 
-            // If the coming message is passed by TCP
-            if (FD_ISSET(TCP_socket, &rset)){
-                // Accept the new connection
-                newConnection = accept(TCP_socket, (struct sockaddr*)&client_info, &client_size);
-                cout<<"New connection."<<endl;
-                pthread_create(&pid[clients++],&attr,TCP_connection,(void *)&newConnection);
+        // If the coming message is passed by TCP
+        if (FD_ISSET(TCP_socket, &rset)){
+            // Accept the new connection
+            newConnection = accept(TCP_socket, (struct sockaddr*)&client_info, &client_size);
+            cout<<"New connection."<<endl;
+            pthread_create(&pid[clients++],&attr,TCP_connection,(void *)&newConnection);
+        }
+        
+        // If the coming message is passed by UDP
+        if (FD_ISSET(UDP_socket, &rset)){
+            // Receive the UDP packet
+            recvfrom(UDP_socket, buffer, sizeof(buffer), 0, (struct sockaddr*)&client_info, &client_size);
+            cout<<"Client(UDP): "<<buffer<<endl;
+            // Classify the message
+            switch(buffer[0]){
+                // Register command
+                case '0':
+                    Register(UDP_socket, buffer, client_info, database);
+                    break;
+                // Whoami command
+                case '3':
+                    Whoami(UDP_socket, buffer, client_info);
+                    break;
+                default:
+                    break;
             }
-
-            // If the coming message is passed by UDP
-            if (FD_ISSET(UDP_socket, &rset)){
-                // Receive the UDP packet
-                recvfrom(UDP_socket, buffer, sizeof(buffer), 0, (struct sockaddr*)&client_info, &client_size);
-                //cout<<"Client(UDP): "<<buffer<<endl;
-                    
-                // Classify the message
-                switch(buffer[0]){
-                    // Register command
-                    case '0':
-                        Register(UDP_socket, buffer, client_info, database);
-                        break;
-                    // Whoami command
-                    case '3':
-                        Whoami(UDP_socket, buffer, client_info);
-                        break;
-                    default:
-                        break;
-                }
-
-                // Flush the buffer
-                memset(&buffer, '\0', sizeof(buffer));
-            }
-		}
-    }
+            // Flush the buffer
+            memset(&buffer, '\0', sizeof(buffer));
+        }
+	}
     close(TCP_socket);
     close(UDP_socket);
 
