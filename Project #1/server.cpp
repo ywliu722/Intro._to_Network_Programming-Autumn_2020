@@ -56,22 +56,38 @@ void Register(int UDP_socket, char* buffer, struct sockaddr_in &client_info, sql
         }
     }
 
-    string sql = "INSERT INTO USERS (Username, Email, Password) VALUES ("
+    bool flag=false;
+    string tmp = "";
+    sqlite3_stmt *Stmt;
+    string sql = "SELECT Username FROM USERS";
+    int fd=sqlite3_prepare_v2(database, sql.c_str(), -1, &Stmt, 0);
+    while(sqlite3_step(Stmt) == SQLITE_ROW){
+        if( strcmp( (char*)sqlite3_column_text(Stmt,0), usr.c_str()) == 0){
+            tmp = "F";
+            flag=true;
+            break;
+        }
+    }
+    sql.clear();
+    if(flag==false){
+        sql = "INSERT INTO USERS (Username, Email, Password) VALUES ("
            + quotesql(usr) + ", "
            + quotesql(email) + ","
            + quotesql(pwd) + ");";
     
-    char *zErrMsg=0;
-    string tmp = "";
-    int result = sqlite3_exec(database, sql.c_str(), 0, 0, &zErrMsg);
-    if( result != SQLITE_OK ){
-        fprintf(stderr, "SQL error: %s\n", zErrMsg);
-        sqlite3_free(zErrMsg);
-        tmp = "F";
+        char *zErrMsg=0;
+    
+        int result = sqlite3_exec(database, sql.c_str(), 0, 0, &zErrMsg);
+        if( result != SQLITE_OK ){
+            //fprintf(stderr, "SQL error: %s\n", zErrMsg);
+            sqlite3_free(zErrMsg);
+            tmp = "F";
+        }
+        else{
+            tmp = "S";
+        }
     }
-    else{
-        tmp = "S";
-    }
+
     // Convert the sting into char*
     int len = tmp.size();
     char send_buffer[len+1];
@@ -196,8 +212,6 @@ void *TCP_connection(void *parameter){
 
     while(1){
         recv(newConnection, buffer, 1024, 0);
-        //printf("Client(TCP): %s\n", buffer);
-
         // Classify the message
         switch(buffer[0]){
             // Login command
@@ -237,6 +251,7 @@ int main(int argc, char* argv[]){
     sqlite3 * database;
     sqlite3_open_v2("user.db", &database, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_NOMUTEX, NULL);
     SQL_Initialization(database);
+    sqlite3_busy_timeout(database, 3*1000);
 
     pthread_t pid[15];
     pthread_attr_t attr;
@@ -288,7 +303,6 @@ int main(int argc, char* argv[]){
     while(1){
         FD_SET(TCP_socket, &rset);
         FD_SET(UDP_socket, &rset);
-        //cout<<"receiving2"<<endl;
         int rec = select(maxfdp, &rset, NULL, NULL, NULL);
 
         // If the coming message is passed by TCP
@@ -303,7 +317,6 @@ int main(int argc, char* argv[]){
         if (FD_ISSET(UDP_socket, &rset)){
             // Receive the UDP packet
             recvfrom(UDP_socket, buffer, sizeof(buffer), 0, (struct sockaddr*)&client_info, &client_size);
-            //cout<<"Client(UDP): "<<buffer<<endl;
             // Classify the message
             switch(buffer[0]){
                 // Register command
