@@ -12,8 +12,7 @@
 #include <arpa/inet.h>
 #include <sqlite3.h>
 #include <pthread.h>
-#include <semaphore.h>
-#include <fcntl.h>
+
 
 #define MAX_CLIENT 10
 
@@ -33,15 +32,14 @@ typedef struct{
 
 // define shared memory type
 typedef struct{
-    sem_t mutex;
+    pthread_mutex_t mutex;
     vector<post> post_list;
     vector<board_info> board_list;
 }shm_mem;
 
 int clients=0;
-shm_mem *memory;
+shm_mem memory;
 vector<string> ClientTable;
-string shm_name = "shared_memory";
 string quotesql( const string& s ) {
     return string("'") + s + string("'");
 }
@@ -62,13 +60,10 @@ void SQL_Initialization(sqlite3 * db){
     }
 }
 void Shared_memory_Initialization(){
-    int shmfd = shm_open(shm_name.c_str(), O_RDWR| O_CREAT, S_IRWXU);
-    ftruncate(shmfd, 2048);
-    memory = (shm_mem*)mmap(NULL, 2048, PROT_READ| PROT_WRITE, MAP_SHARED, shmfd, 0);
-    sem_init(&memory->mutex, 0, 1);
+    pthread_mutex_init(&memory.mutex, NULL);
 
-    memory->post_list.clear();
-    memory->board_list.clear();
+    memory.post_list.clear();
+    memory.board_list.clear();
 }
 void Register(int UDP_socket, char* buffer, struct sockaddr_in &client_info, sqlite3 *database){
     int index=0;
@@ -242,22 +237,21 @@ void Create_Board(int newConnection, char* buffer){
     string board_name="";
     string moderator="";
     moderator += ClientTable[random_number];
-    for(int i=5 ; i<sizeof(buffer); i++){
+    for(int i=5 ; i<strlen(buffer); i++){
         if(buffer[i] == '\0'){
             break;
         }
         board_name += buffer[i];
     }
-
     // check if the board name is exist or not
-    sem_wait(&memory->mutex);
-    for(int i=0;i<memory->board_list.size();i++){
-        if(memory->board_list[i].board_name == board_name){
+    pthread_mutex_lock(&memory.mutex);
+    for(int i=0;i<memory.board_list.size();i++){
+        if(memory.board_list[i].board_name == board_name){
             send_back="Board already exists.";
             break;
         }
     }
-    sem_post(&memory->mutex);
+    pthread_mutex_unlock(&memory.mutex);
 
     // if the board name is avaliable
     if(send_back != "Board already exists."){
@@ -266,9 +260,9 @@ void Create_Board(int newConnection, char* buffer){
         tmp.moderator = moderator;
         tmp.postSN.clear();
 
-        sem_wait(&memory->mutex);
-        memory->board_list.push_back(tmp);
-        sem_post(&memory->mutex);
+        pthread_mutex_lock(&memory.mutex);
+        memory.board_list.push_back(tmp);
+        pthread_mutex_unlock(&memory.mutex);
         send_back="Create board successfully.";
     }
     // Convert the sting into char*
@@ -285,7 +279,18 @@ void Create_Post(int newConnection, char* buffer){
 }
 //list-board
 void List_Board(int newConnection){
-
+    string send_back="Index\tTitle\tModerator";
+    pthread_mutex_lock(&memory.mutex);
+    for(int i=0;i<memory.board_list.size();i++){
+        send_back = send_back + "\n" + to_string(i+1) + "\t" + memory.board_list[i].board_name + "\t" + memory.board_list[i].moderator;
+    }
+    pthread_mutex_unlock(&memory.mutex);
+    // Convert the sting into char*
+    int back_len = sizeof(send_back);
+    char send_buffer[back_len+1];
+    memset(&send_buffer, '\0', sizeof(send_buffer));
+    strcpy(send_buffer, send_back.c_str());
+    send(newConnection, send_buffer, strlen(send_buffer), 0);
 }
 //list-post
 void List_Post(int newConnection, char* buffer){

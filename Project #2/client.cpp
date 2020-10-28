@@ -206,7 +206,22 @@ void Create_Post(int TCP_socket, string input){
 }
 //list-board
 void List_Board(int TCP_socket){
-    string tmp = "62 ";
+    string tmp = "62";
+    int len = tmp.size();
+
+    char send_buffer[len+1];
+    char receive_buffer[2048];
+    memset(&send_buffer, '\0', sizeof(send_buffer));
+    memset(&receive_buffer, '\0', sizeof(receive_buffer));
+
+    strcpy(send_buffer, tmp.c_str());
+    send(TCP_socket, send_buffer, strlen(send_buffer), 0);
+    if(recv(TCP_socket, receive_buffer, 2048, 0) < 0){
+	    cout<<"Error receiving data!"<<endl;
+	}
+    else{
+        cout<<receive_buffer<<endl;
+    }
 }
 //list-post
 void List_Post(int TCP_socket, string input){
@@ -299,6 +314,7 @@ int main(int argc, char *argv[]){
             continue;
         }
         else if(command == "list-board"){
+            List_Board(TCP_socket);
             cout<<"% ";
             continue;
         }
