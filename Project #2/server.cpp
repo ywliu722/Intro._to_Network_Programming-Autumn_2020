@@ -21,7 +21,7 @@ using namespace std;
 // define post type
 typedef struct{
     string title, author, date;
-    string content;
+    string content, comment;
 }post;
 
 // define board type
@@ -198,7 +198,7 @@ void Logout(int newConnection, char* buffer){
     ClientTable[random_number]+="-";
     
     // Convert the sting into char*
-    int back_len = sizeof(back);
+    int back_len = back.size();
     char send_buffer[back_len+1];
     memset(&send_buffer, '\0', sizeof(send_buffer));
     strcpy(send_buffer, back.c_str());
@@ -243,6 +243,9 @@ void Create_Board(int newConnection, char* buffer){
         }
         board_name += buffer[i];
     }
+    if(board_name == ""){
+        send_back = "Usage: create-board <name>";
+    }
     // check if the board name is exist or not
     pthread_mutex_lock(&memory.mutex);
     for(int i=0;i<memory.board_list.size();i++){
@@ -254,7 +257,7 @@ void Create_Board(int newConnection, char* buffer){
     pthread_mutex_unlock(&memory.mutex);
 
     // if the board name is avaliable
-    if(send_back != "Board already exists."){
+    if(send_back != "Board already exists." && send_back != "Usage: create-board <name>"){
         board_info tmp;
         tmp.board_name = board_name;
         tmp.moderator = moderator;
@@ -266,51 +269,328 @@ void Create_Board(int newConnection, char* buffer){
         send_back="Create board successfully.";
     }
     // Convert the sting into char*
-    int back_len = sizeof(send_back);
+    int back_len = send_back.size();
     char send_buffer[back_len+1];
     memset(&send_buffer, '\0', sizeof(send_buffer));
     strcpy(send_buffer, send_back.c_str());
     send(newConnection, send_buffer, strlen(send_buffer), 0);
     
 }
-//create-post
 void Create_Post(int newConnection, char* buffer){
+    int random_number = buffer[3] - '0';
 
+    string send_back="";
+    string buff = buffer;
+    string delimiter1 = " --title ";
+    string delimiter2 = " --content ";
+    string delimiter3 = "<br>";
+
+    bool flag = false;
+    buff.erase(0, buff.find(" ")+1);
+    buff.erase(0, buff.find(" ")+1);
+    if(buff.find(delimiter1) == string::npos){
+        flag=true;
+    }
+    string board_name = buff.substr(0, buff.find(delimiter1));
+    buff.erase(0, buff.find(delimiter1)+delimiter1.size());
+    string title = buff.substr(0, buff.find(delimiter2));
+    if(buff.find(delimiter2) == string::npos){
+        flag=true;
+    }
+    string content_buffer =  buff.erase(0, buff.find(delimiter2)+delimiter2.size());
+    string content = "--";
+
+    // check the format
+    if(title=="" || content_buffer=="" || flag){
+        send_back="Usage: create-post <board-name> --title <title> --content <content>";
+    }
+    else{
+        // check if the board name is exist or not
+        flag = true;
+        int index=0;
+        pthread_mutex_lock(&memory.mutex);
+        for(int i=0;i<memory.board_list.size();i++){
+            if(memory.board_list[i].board_name == board_name){
+                flag=false;
+                index=i;
+                break;
+            }
+        }
+        pthread_mutex_unlock(&memory.mutex);
+        if(flag){
+            send_back="Board does not exist.";
+        }
+        else{
+            while(content_buffer.find(delimiter3) != string::npos){
+                content = content + "\n" + content_buffer.substr(0, content_buffer.find(delimiter3));
+                content_buffer.erase(0, content_buffer.find(delimiter3)+delimiter3.size());
+            }
+            content = content + "\n" + content_buffer + "\n" + "--";
+
+            // get current date
+            time_t now = time(0);
+            tm *ltm = localtime(&now);
+            string date = to_string(ltm->tm_mon) + "/" + to_string(ltm->tm_mday);
+
+            post tmp;
+            tmp.author=ClientTable[random_number];
+            tmp.title=title;
+            tmp.date=date;
+            tmp.content=content;
+            tmp.comment="";
+
+            pthread_mutex_lock(&memory.mutex);
+            memory.post_list.push_back(tmp);
+            int sn = memory.post_list.size();
+            memory.board_list[index].postSN.push_back(sn);
+            pthread_mutex_unlock(&memory.mutex);
+            send_back = "Create post successfully.";
+        }
+    }
+    // Convert the sting into char*
+    int back_len = send_back.size();
+    char send_buffer[back_len+1];
+    memset(&send_buffer, '\0', sizeof(send_buffer));
+    strcpy(send_buffer, send_back.c_str());
+    send(newConnection, send_buffer, strlen(send_buffer), 0);
 }
-//list-board
 void List_Board(int newConnection){
-    string send_back="Index\tTitle\tModerator";
+    string send_back="Index\tName\tModerator";
     pthread_mutex_lock(&memory.mutex);
     for(int i=0;i<memory.board_list.size();i++){
         send_back = send_back + "\n" + to_string(i+1) + "\t" + memory.board_list[i].board_name + "\t" + memory.board_list[i].moderator;
     }
     pthread_mutex_unlock(&memory.mutex);
     // Convert the sting into char*
-    int back_len = sizeof(send_back);
+    int back_len = send_back.size();
     char send_buffer[back_len+1];
     memset(&send_buffer, '\0', sizeof(send_buffer));
     strcpy(send_buffer, send_back.c_str());
     send(newConnection, send_buffer, strlen(send_buffer), 0);
 }
-//list-post
 void List_Post(int newConnection, char* buffer){
-
+    string send_back="";
+    string board_name="";
+    for(int i=3;i<strlen(buffer);i++){
+        if(buffer[i] == '\0'){
+            break;
+        }
+        board_name +=buffer[i];
+    }
+    if(board_name==""){
+        send_back = "Usage: list-post <board-name>";
+    }
+    else{
+        int index=-1;
+        pthread_mutex_lock(&memory.mutex);
+        for(int i=0;i<memory.board_list.size();i++){
+            if(board_name == memory.board_list[i].board_name){
+                index = i;
+                break;
+            }
+        }
+        pthread_mutex_unlock(&memory.mutex);
+        if(index == -1){
+            send_back = "Board does not exist.";
+        }
+        else{
+            send_back = "S/N\tTitle\t\tAuthor\tDate";
+            pthread_mutex_lock(&memory.mutex);
+            for(int i=0;i<memory.board_list[index].postSN.size();i++){
+                int sn=memory.board_list[index].postSN[i] -1;
+                if(memory.post_list[sn].author == ""){
+                    continue;
+                }
+                send_back = send_back + "\n" + to_string(sn+1) + "\t" + memory.post_list[sn].title + "\t\t" + memory.post_list[sn].author + "\t" + memory.post_list[sn].date;
+            }
+            pthread_mutex_unlock(&memory.mutex);
+        }
+    }
+    // Convert the sting into char*
+    int back_len = send_back.size();
+    char send_buffer[back_len+1];
+    memset(&send_buffer, '\0', sizeof(send_buffer));
+    strcpy(send_buffer, send_back.c_str());
+    send(newConnection, send_buffer, sizeof(send_buffer), 0);
 }
-//read
 void Read(int newConnection, char* buffer){
-
+    string send_back = "";
+    string tmp_sn = "";
+    for(int i=3;i<strlen(buffer);i++){
+        if(buffer[i]=='\0'){
+            break;
+        }
+        tmp_sn += buffer[i];
+    }
+    if(tmp_sn ==""){
+        send_back = "Usage: read <post-S/N>";
+    }
+    else{
+        int sn = stoi(tmp_sn) - 1;
+        pthread_mutex_lock(&memory.mutex);
+        if(sn>memory.post_list.size() || memory.post_list[sn].author==""){
+            send_back = "Post does not exist.";
+        }
+        else{
+            send_back = send_back + "Author: " + memory.post_list[sn].author + "\nTitle: " + memory.post_list[sn].title + "\nDate: " + memory.post_list[sn].date + "\n" + memory.post_list[sn].content;
+            if(memory.post_list[sn].comment !=""){
+                send_back = send_back +  memory.post_list[sn].comment;
+            }
+        }
+        pthread_mutex_unlock(&memory.mutex);
+    }
+    // Convert the sting into char*
+    int back_len = send_back.size();
+    char send_buffer[back_len+1];
+    memset(&send_buffer, '\0', sizeof(send_buffer));
+    strcpy(send_buffer, send_back.c_str());
+    send(newConnection, send_buffer, strlen(send_buffer), 0);
 }
-//delete-post
 void Delete_Post(int newConnection, char* buffer){
-
+    string send_back = "";
+    string tmp_sn = "";
+    for(int i=5;i<strlen(buffer);i++){
+        if(buffer[i]=='\0'){
+            break;
+        }
+        tmp_sn += buffer[i];
+    }
+    if(tmp_sn == ""){
+        send_back = "Usage: delete-post <post-S/N>";
+    }
+    else{
+        int sn = stoi(tmp_sn) - 1;
+        int random_number = buffer[3]-'0';
+        pthread_mutex_lock(&memory.mutex);
+        if(sn>memory.post_list.size() || memory.post_list[sn].author==""){
+            send_back = "Post does not exist.";
+        }
+        else if(ClientTable[random_number] != memory.post_list[sn].author){
+            send_back = "Not the post owner.";
+        }
+        else{
+            memory.post_list[sn].author="";
+            memory.post_list[sn].content="";
+            memory.post_list[sn].comment="";
+            send_back = "Delete successfully.";
+        }
+        pthread_mutex_unlock(&memory.mutex);
+    }
+    
+    // Convert the sting into char*
+    int back_len = send_back.size();
+    char send_buffer[back_len+1];
+    memset(&send_buffer, '\0', sizeof(send_buffer));
+    strcpy(send_buffer, send_back.c_str());
+    send(newConnection, send_buffer, strlen(send_buffer), 0);
 }
-//update-post
 void Update_Post(int newConnection, char* buffer){
-
+    string send_back = "";
+    string tmp_sn = "";
+    int index=-1;
+    bool title_flag=false, content_flag=false;
+    for(int i=5;i<strlen(buffer);i++){
+        if(buffer[i]==' '){
+            index = i;
+            break;
+        }
+        tmp_sn += buffer[i];
+    }
+    string buff = buffer;
+    string delimiter1 = " --title ";
+    string delimiter2 = " --content ";
+    string delimiter3 = "<br>";
+    string tmp="";
+    if(buff.find(delimiter1) != string::npos){
+        title_flag=true;
+        for(int i=index+9;i<buff.size();i++){
+            tmp+=buff[i];
+        }
+    }
+    else if(buff.find(delimiter2) != string::npos){
+        content_flag=true;
+        for(int i=index+11;i<buff.size();i++){
+            tmp+=buff[i];
+        }
+    }
+    if(tmp_sn == "" || (!title_flag && !content_flag)){
+        send_back = "Usage: update-post <post-S/N> --title/content <new>";
+    }
+    else{
+        int sn = stoi(tmp_sn) - 1;
+        int random_number = buffer[3]-'0';
+        pthread_mutex_lock(&memory.mutex);
+        if(sn>memory.post_list.size() || memory.post_list[sn].author==""){
+            send_back = "Post does not exist.";
+        }
+        else if(ClientTable[random_number] != memory.post_list[sn].author){
+            send_back = "Not the post owner.";
+        }
+        else{
+            if(title_flag){
+                memory.post_list[sn].title=tmp;
+            }
+            else{
+                string content="--";
+                while(tmp.find(delimiter3) != string::npos){
+                    content = content + "\n" + tmp.substr(0, tmp.find(delimiter3));
+                    tmp.erase(0, tmp.find(delimiter3)+delimiter3.size());
+                }
+                content = content + "\n" + tmp + "\n" + "--";
+                memory.post_list[sn].content= "" + content;
+            }
+            send_back = "Update successfully.";
+        }
+        pthread_mutex_unlock(&memory.mutex);
+    }
+    
+    // Convert the sting into char*
+    int back_len = send_back.size();
+    char send_buffer[back_len+1];
+    memset(&send_buffer, '\0', sizeof(send_buffer));
+    strcpy(send_buffer, send_back.c_str());
+    send(newConnection, send_buffer, strlen(send_buffer), 0);
 }
-//comment
 void Comment(int newConnection, char* buffer){
-
+    string send_back = "";
+    string tmp_sn = "";
+    string comment="";
+    int index=-1;
+    for(int i=5;i<strlen(buffer);i++){
+        if(buffer[i]==' '){
+            index = i+1;
+            break;
+        }
+        tmp_sn += buffer[i];
+    }
+    for(int i=index;i<strlen(buffer);i++){
+        if(buffer[i]=='\0'){
+            break;
+        }
+        comment += buffer[i];
+    }
+    if(tmp_sn == "" || comment == ""){
+        send_back = "Usage: comment <post-S/N> <comment>";
+    }
+    else{
+        int sn = stoi(tmp_sn) - 1;
+        int random_number = buffer[3]-'0';
+        pthread_mutex_lock(&memory.mutex);
+        if(sn>memory.post_list.size() || memory.post_list[sn].author==""){
+            send_back = "Post does not exist.";
+        }
+        else{
+            memory.post_list[sn].comment = memory.post_list[sn].comment + "\n" + ClientTable[random_number] + ": " + comment;
+            send_back = "Comment successfully.";
+        }
+        pthread_mutex_unlock(&memory.mutex);
+    }
+    // Convert the sting into char*
+    int back_len = send_back.size();
+    char send_buffer[back_len+1];
+    memset(&send_buffer, '\0', sizeof(send_buffer));
+    strcpy(send_buffer, send_back.c_str());
+    send(newConnection, send_buffer, strlen(send_buffer), 0);
 }
 void *TCP_connection(void *parameter){
     int newConnection = *((int *)parameter);

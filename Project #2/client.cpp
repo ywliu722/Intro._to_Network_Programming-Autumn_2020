@@ -32,7 +32,6 @@ vector<string> input_processing(string client_input){
     }
     return result;
 }
-// Register
 void Register(int UDP_socket, vector<string> &client_command, struct sockaddr_in &server_info){
     string tmp = "0 " + client_command[1] + " " + client_command[2] + " " + client_command[3];
     int len = tmp.size();
@@ -57,7 +56,6 @@ void Register(int UDP_socket, vector<string> &client_command, struct sockaddr_in
         }
     }
 }
-// Login
 int Login(int TCP_socket, vector<string> &client_command){
     string tmp = "1 " + client_command[1] + " " + client_command[2];
     int len = tmp.size();
@@ -88,7 +86,6 @@ int Login(int TCP_socket, vector<string> &client_command){
 	}
     return -1;
 }
-// Logout
 void Logout(int TCP_socket, int random_number){
     string tmp = "2 " + to_string(random_number);
     int len = tmp.size();
@@ -107,7 +104,6 @@ void Logout(int TCP_socket, int random_number){
         cout<<receive_buffer<<endl;
     }
 }
-// Whoami
 void Whoami(int UDP_socket, int random_number, struct sockaddr_in &server_info){
     string tmp = "3 " + to_string(random_number);
     int len = tmp.size();
@@ -126,7 +122,6 @@ void Whoami(int UDP_socket, int random_number, struct sockaddr_in &server_info){
         cout<<receive_buffer<<endl;
     }
 }
-// List-User
 void List_User(int TCP_socket){
     string tmp = "4";
     int len = tmp.size();
@@ -164,7 +159,6 @@ void List_User(int TCP_socket){
         }
     }
 }
-// Exit
 void Exit(int TCP_socket, int UDP_socket){
     string tmp="5";
     int len = tmp.size();
@@ -201,10 +195,28 @@ void Create_Board(int TCP_socket, string input, int random_number){
         cout<<receive_buffer<<endl;
     }
 }
-void Create_Post(int TCP_socket, string input){
+void Create_Post(int TCP_socket, string input, int random_number){
     string tmp = "61 ";
+    tmp = tmp +to_string(random_number) + " ";
+    for(int i=12 ; i<input.size();i++){
+        tmp += input[i];
+    }
+    int len = tmp.size();
+
+    char send_buffer[len+1];
+    char receive_buffer[2048];
+    memset(&send_buffer, '\0', sizeof(send_buffer));
+    memset(&receive_buffer, '\0', sizeof(receive_buffer));
+
+    strcpy(send_buffer, tmp.c_str());
+    send(TCP_socket, send_buffer, strlen(send_buffer), 0);
+    if(recv(TCP_socket, receive_buffer, 2048, 0) < 0){
+	    cout<<"Error receiving data!"<<endl;
+	}
+    else{
+        cout<<receive_buffer<<endl;
+    }
 }
-//list-board
 void List_Board(int TCP_socket){
     string tmp = "62";
     int len = tmp.size();
@@ -223,27 +235,114 @@ void List_Board(int TCP_socket){
         cout<<receive_buffer<<endl;
     }
 }
-//list-post
 void List_Post(int TCP_socket, string input){
     string tmp = "63 ";
+    for(int i=10 ; i<input.size();i++){
+        tmp += input[i];
+    }
+    int len = tmp.size();
+
+    char send_buffer[len+1];
+    char receive_buffer[4096];
+    memset(&send_buffer, '\0', sizeof(send_buffer));
+    memset(&receive_buffer, '\0', sizeof(receive_buffer));
+
+    strcpy(send_buffer, tmp.c_str());
+    send(TCP_socket, send_buffer, strlen(send_buffer), 0);
+    if(recv(TCP_socket, receive_buffer, 4096, 0) < 0){
+	    cout<<"Error receiving data!"<<endl;
+	}
+    else{
+        cout<<receive_buffer<<endl;
+    }
 }
-//read
 void Read(int TCP_socket, string input){
     string tmp = "64 ";
+    for(int i=5 ; i<input.size();i++){
+        tmp += input[i];
+    }
+    int len = tmp.size();
+
+    char send_buffer[len+1];
+    char receive_buffer[4096];
+    memset(&send_buffer, '\0', sizeof(send_buffer));
+    memset(&receive_buffer, '\0', sizeof(receive_buffer));
+
+    strcpy(send_buffer, tmp.c_str());
+    send(TCP_socket, send_buffer, strlen(send_buffer), 0);
+    if(recv(TCP_socket, receive_buffer, 4096, 0) < 0){
+	    cout<<"Error receiving data!"<<endl;
+	}
+    else{
+        cout<<receive_buffer<<endl;
+    }
 }
-//delete-post
-void Delete_Post(int TCP_socket, string input){
+void Delete_Post(int TCP_socket, string input, int random_number){
     string tmp = "65 ";
+    tmp = tmp +to_string(random_number) + " ";
+    for(int i=12 ; i<input.size();i++){
+        tmp += input[i];
+    }
+    int len = tmp.size();
+
+    char send_buffer[len+1];
+    char receive_buffer[2048];
+    memset(&send_buffer, '\0', sizeof(send_buffer));
+    memset(&receive_buffer, '\0', sizeof(receive_buffer));
+
+    strcpy(send_buffer, tmp.c_str());
+    send(TCP_socket, send_buffer, strlen(send_buffer), 0);
+    if(recv(TCP_socket, receive_buffer, 2048, 0) < 0){
+	    cout<<"Error receiving data!"<<endl;
+	}
+    else{
+        cout<<receive_buffer<<endl;
+    }
 }
-//update-post
-void Update_Post(int TCP_socket, string input){
+void Update_Post(int TCP_socket, string input, int random_number){
     string tmp = "66 ";
+    tmp = tmp +to_string(random_number) + " ";
+    for(int i=12 ; i<input.size();i++){
+        tmp += input[i];
+    }
+    int len = tmp.size();
+
+    char send_buffer[len+1];
+    char receive_buffer[2048];
+    memset(&send_buffer, '\0', sizeof(send_buffer));
+    memset(&receive_buffer, '\0', sizeof(receive_buffer));
+
+    strcpy(send_buffer, tmp.c_str());
+    send(TCP_socket, send_buffer, strlen(send_buffer), 0);
+    if(recv(TCP_socket, receive_buffer, 2048, 0) < 0){
+	    cout<<"Error receiving data!"<<endl;
+	}
+    else{
+        cout<<receive_buffer<<endl;
+    }
 }
-//comment
-void Comment(int TCP_socket, string input){
+void Comment(int TCP_socket, string input, int random_number){
     string tmp = "67 ";
+    tmp = tmp +to_string(random_number) + " ";
+    for(int i=8 ; i<input.size();i++){
+        tmp += input[i];
+    }
+    int len = tmp.size();
+
+    char send_buffer[len+1];
+    char receive_buffer[2048];
+    memset(&send_buffer, '\0', sizeof(send_buffer));
+    memset(&receive_buffer, '\0', sizeof(receive_buffer));
+
+    strcpy(send_buffer, tmp.c_str());
+    send(TCP_socket, send_buffer, strlen(send_buffer), 0);
+    if(recv(TCP_socket, receive_buffer, 2048, 0) < 0){
+	    cout<<"Error receiving data!"<<endl;
+	}
+    else{
+        cout<<receive_buffer<<endl;
+    }
 }
-// Main function
 int main(int argc, char *argv[]){
 
     // Get and process the information from command line
@@ -310,6 +409,9 @@ int main(int argc, char *argv[]){
             if(random_number<0){
                 cout<<"Please login first."<<endl;
             }
+            else{
+                Create_Post(TCP_socket, client_input, random_number);
+            }
             cout<<"% ";
             continue;
         }
@@ -319,16 +421,21 @@ int main(int argc, char *argv[]){
             continue;
         }
         else if(command == "list-post"){
+            List_Post(TCP_socket, client_input);
             cout<<"% ";
             continue;
         }
         else if(command == "read"){
+            Read(TCP_socket, client_input);
             cout<<"% ";
             continue;
         }
         else if(command == "delete-post"){
             if(random_number<0){
                 cout<<"Please login first."<<endl;
+            }
+            else{
+                Delete_Post(TCP_socket, client_input, random_number);
             }
             cout<<"% ";
             continue;
@@ -337,12 +444,18 @@ int main(int argc, char *argv[]){
             if(random_number<0){
                 cout<<"Please login first."<<endl;
             }
+            else{
+                Update_Post(TCP_socket, client_input, random_number);
+            }
             cout<<"% ";
             continue;
         }
         else if(command == "comment"){
             if(random_number<0){
                 cout<<"Please login first."<<endl;
+            }
+            else{
+                Comment(TCP_socket, client_input, random_number);
             }
             cout<<"% ";
             continue;
