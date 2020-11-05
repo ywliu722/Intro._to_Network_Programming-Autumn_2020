@@ -330,7 +330,7 @@ void Create_Post(int newConnection, char* buffer){
             // get current date
             time_t now = time(0);
             tm *ltm = localtime(&now);
-            string date = to_string(ltm->tm_mon) + "/" + to_string(ltm->tm_mday);
+            string date = to_string(ltm->tm_mon +1) + "/" + to_string(ltm->tm_mday);
 
             post tmp;
             tmp.author=ClientTable[random_number];
@@ -355,10 +355,15 @@ void Create_Post(int newConnection, char* buffer){
     send(newConnection, send_buffer, strlen(send_buffer), 0);
 }
 void List_Board(int newConnection){
-    string send_back="Index\tName\tModerator";
+    string send_back="Index\tName\t\tModerator";
     pthread_mutex_lock(&memory.mutex);
     for(int i=0;i<memory.board_list.size();i++){
-        send_back = send_back + "\n" + to_string(i+1) + "\t" + memory.board_list[i].board_name + "\t" + memory.board_list[i].moderator;
+        if(memory.board_list[i].board_name.size() >8){
+            send_back = send_back + "\n" + to_string(i+1) + "\t" + memory.board_list[i].board_name + "\t" + memory.board_list[i].moderator;
+        }
+        else{
+            send_back = send_back + "\n" + to_string(i+1) + "\t" + memory.board_list[i].board_name + "\t\t" + memory.board_list[i].moderator;
+        }
     }
     pthread_mutex_unlock(&memory.mutex);
     // Convert the sting into char*
@@ -394,7 +399,7 @@ void List_Post(int newConnection, char* buffer){
             send_back = "Board does not exist.";
         }
         else{
-            send_back = "S/N\tTitle\t\tAuthor\tDate";
+            send_back = "S/N\tTitle\t\t\tAuthor\tDate";
             pthread_mutex_lock(&memory.mutex);
             for(int i=0;i<memory.board_list[index].postSN.size();i++){
                 int sn=memory.board_list[index].postSN[i] -1;
