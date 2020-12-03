@@ -68,9 +68,12 @@ void Register(int UDP_socket, vector<string> &client_command, struct sockaddr_in
         }
     }
 }
-int Login(int TCP_socket, vector<string> &client_command){
+vector<int> Login(int TCP_socket, vector<string> &client_command){
     string tmp = "1 " + client_command[1] + " " + client_command[2];
     int len = tmp.size();
+
+    vector<int> re;
+    re.resize(2,-1);
 
     char send_buffer[len+1];
     char receive_buffer[1024];
@@ -84,20 +87,21 @@ int Login(int TCP_socket, vector<string> &client_command){
 	}
     else{
         if(receive_buffer[0]=='0'){
-            int len = strlen(receive_buffer) -2;
+            re[0] = receive_buffer[2] - '0';
+            int len = strlen(receive_buffer) -4;
             char tmp[len+1];
-            memcpy(tmp, &receive_buffer[2], len);
-            int random_number = atoi(tmp);
+            memcpy(tmp, &receive_buffer[4], len);
+            re[1] = atoi(tmp);
             cout<<"Welcome, "<<client_command[1]<<endl;
             usr=client_command[1];
-            return random_number;
+            return re;
         }
         else{
             cout<<"Login failed."<<endl;
-            return -1;
+            return re;
         }
 	}
-    return -1;
+    return re;
 }
 bool Logout(int TCP_socket, int random_number){
     string tmp = "2 " + to_string(random_number);
@@ -430,6 +434,9 @@ void Connect_Chat(int port, int random_number, int TCP_socket){
         cout<<"TCP socket creation error!"<<endl;
         return;
     }
+    if(port >=5550 && port <=5559){
+        port +=10;
+    }
     // Socket Connection
     struct sockaddr_in server_info;
     bzero(&server_info, sizeof(server_info));
@@ -491,17 +498,12 @@ void Connect_Chat(int port, int random_number, int TCP_socket){
                 break;
             }
         }
-        else if(input == "detach"){
-            if(isOwner){
-                vector<string> timing = getTime();
-                string msg= "!" + to_string(random_number) + "sys[" + timing[0] + ":" + timing[1] + "] : " + usr + " leave us.";
-                send(chat_socket, msg.c_str(), msg.size(), 0);
-                close(chat_socket);
-                break;
-            }
-            else{
-                /*Ask this*/
-            }
+        else if(input == "detach" && isOwner){
+            vector<string> timing = getTime();
+            string msg= "!" + to_string(random_number) + "sys[" + timing[0] + ":" + timing[1] + "] : " + usr + " leave us.";
+            send(chat_socket, msg.c_str(), msg.size(), 0);
+            close(chat_socket);
+            break;
         }
         else{
             vector<string> timing = getTime();
@@ -521,7 +523,7 @@ void *Chat(void *parameter){
     chat_info *para=(chat_info*)parameter;
     int port = para->port;
     int random_number = para->random_number;
-    string command = "./chat " + to_string(random_number) + " " + to_string(port);
+    string command = "./chat " + to_string(random_number) + " " + to_string(port) + " " + usr;
     system(command.c_str());
 }
 int Create_Chatroom(int TCP_socket, int random_number, vector<string> &client_command){
@@ -637,6 +639,7 @@ bool Restart_Chatroom(int TCP_socket, int random_number, int port){
             para.random_number=random_number;
             pthread_attr_init(&attrc);
             pthread_create(&pid[0],&attrc,Chat,(void *)&para);
+            sleep(1);
             return true;
         }
         else if(receive_buffer[0]=='N'){
@@ -808,8 +811,10 @@ int main(int argc, char *argv[]){
                 cout<<"Usage: login <username> <password>"<<endl;
             }
             else{
-                random_number = Login(TCP_socket, client_command);
-                cout<<random_number<<endl;
+                vector<int> re = Login(TCP_socket, client_command);
+                random_number = re[0];
+                chat_port = re[1];
+                //cout<<random_number<<endl;
             }
         }
         else if(client_command[0] == "logout"){

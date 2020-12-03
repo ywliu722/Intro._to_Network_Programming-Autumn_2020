@@ -41,6 +41,7 @@ int clients=0;
 shm_mem memory;
 vector<string> ClientTable;
 vector<string> Chat_Status; // Chatroom Status
+vector<string> Chat_Name;
 vector<int> Chat_port; // Chatroom port
 string quotesql( const string& s ) {
     return string("'") + s + string("'");
@@ -166,16 +167,29 @@ void Login(int newConnection, char* buffer, sqlite3 * database){
         if(strcmp(ret,pwd.c_str())==0){
             tmp="0 ";
             int random_number = 0;
-            srand( time(NULL) );
-            while(1){
-                random_number = rand() % MAX_CLIENT;
-                if(ClientTable[random_number]=="-"){
+            bool already=false;
+            for(int i=0;i<Chat_Name.size();i++){
+                if(usr == Chat_Name[i]){
+                    random_number = i;
                     ClientTable[random_number].clear();
                     ClientTable[random_number] += usr;
-                    break;
+                    already = true;
                 }
             }
-            tmp+=to_string(random_number);
+            if(!already){
+                srand( time(NULL) );
+                while(1){
+                    random_number = rand() % MAX_CLIENT;
+                    if(ClientTable[random_number]=="-"){
+                        ClientTable[random_number].clear();
+                        ClientTable[random_number] += usr;
+                        Chat_Name[random_number].clear();
+                        Chat_Name[random_number]+= usr;
+                        break;
+                    }
+                }
+            }
+            tmp = tmp + to_string(random_number) + " " + to_string(Chat_port[random_number]);
         }
         else{
             tmp="1 ";
@@ -195,7 +209,7 @@ void Login(int newConnection, char* buffer, sqlite3 * database){
 void Logout(int newConnection, char* buffer){
     string back="Bye, ";
     int random_number = buffer[2]-'0';
-    if(Chat_Status[random_number]=="RUNNING"){
+    if(Chat_Status[random_number]=="OPEN"){
         back = "R";
     }
     else{
@@ -640,7 +654,7 @@ void List_Chatroom(int UDP_socket, struct sockaddr_in &client_info){
             continue;
         }
         else{
-            send_back = send_back  + "\n" + ClientTable[i] + "\t\t" + Chat_Status[i];
+            send_back = send_back  + "\n" + Chat_Name[i] + "\t\t" + Chat_Status[i];
         }
     }
     // Convert the sting into char*
@@ -773,7 +787,8 @@ int main(int argc, char* argv[]){
     // Initialize the client table
     ClientTable.resize(MAX_CLIENT, "-");
     Chat_Status.resize(MAX_CLIENT, "UNDEFINED");
-    Chat_port.resize(MAX_CLIENT, -1);
+    Chat_port.resize(MAX_CLIENT, 0);
+    Chat_Name.resize(MAX_CLIENT, "-");
 
     // Initialize shared memory
     Shared_memory_Initialization();

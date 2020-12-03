@@ -16,12 +16,13 @@ pthread_t pid[15], udp_pid;
 vector<bool> online;
 vector<string> chat_record;
 vector<string> sys_record;
+int sys_num=0, chat_num=0;
 bool closed_server=false;
 string leave_room = "---Close Server---";
+string owner_name="";
 
 void *UDP_Broadcast(void *parameter){
     int owner = *((int *)parameter);
-    int sys_num=0, chat_num=0;
     int UDP_socket = socket(AF_INET, SOCK_DGRAM, 0);
     while(1){
         if(closed_server){
@@ -35,6 +36,25 @@ void *UDP_Broadcast(void *parameter){
                     sendto(UDP_socket, msg.c_str(), msg.size(), 0, (struct sockaddr *) &receiverAddr, sizeof(receiverAddr));
                 }
             }
+            fstream fd;
+            fd.open(owner_name.c_str(), ios::out);
+            if(chat_record.size()<3){
+                for(int i=0;i<chat_record.size();i++){
+                    fd<<chat_record[i];
+                    if(i!=chat_record.size()-1){
+                        fd<<"\n";
+                    }
+                }
+            }
+            else{
+                for(int i=chat_record.size()-3;i<chat_record.size();i++){
+                    fd<<chat_record[i];
+                    if(i!=chat_record.size()-1){
+                        fd<<"\n";
+                    }
+                }
+            }
+            fd.close();
             break;
         }
         // sending system messages to chat owner
@@ -150,7 +170,10 @@ void *TCP_connection(void *parameter){
 int main(int argc, char *argv[]){
     int owner = atoi(argv[1]);
     int port = atoi(argv[2]);
+    char *filename = argv[3];
     online.resize(10, false);
+    chat_record.resize(0);
+    sys_record.resize(0);
 
     pthread_attr_t attr, attru;
     pthread_attr_init(&attr);
@@ -163,6 +186,30 @@ int main(int argc, char *argv[]){
     server_info.sin_family = AF_INET;
     server_info.sin_addr.s_addr = inet_addr("127.0.0.1");
     server_info.sin_port = htons(port);
+
+    fstream fd_tmp;
+    fd_tmp.open(filename, ios::out|ios::app);
+    fd_tmp.close();
+
+    string input="";
+    fstream fd;
+    fd.open(filename, ios::in);
+    while(!fd.eof()){
+        getline(fd, input);
+        if(input.size()>3){
+            chat_record.push_back(input);
+        }
+        input.clear();
+    }
+    fd.close();
+    chat_num = chat_record.size();
+
+    for(int i=0;i<strlen(filename);i++){
+        if(filename[i]=='\0'){
+            break;
+        }
+        owner_name+=filename[i];
+    }
 
     bind(TCP_socket, (struct sockaddr *) &server_info, sizeof(server_info));
     listen(TCP_socket, 10);
