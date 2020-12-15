@@ -447,6 +447,11 @@ void Connect_Chat(int port, int random_number, int TCP_socket){
     int chat_connection = connect(chat_socket, (struct sockaddr *) &server_info, sizeof(server_info));
     if(chat_connection<0){
         cout<<"Connection error!"<<endl;
+        if(isOwner){
+            Leave_Chatroom(TCP_socket, random_number);
+	        pthread_cancel(pid[0]);
+        }
+        close(chat_socket);
         return;
     }
     pthread_create(&pid[1],&attr,Receiving_Chat,(void *)&random_number);

@@ -16,6 +16,7 @@ pthread_t pid[15], udp_pid;
 vector<bool> online;
 vector<string> chat_record;
 vector<string> sys_record;
+int TCP_socket=0;
 int sys_num=0, chat_num=0;
 bool closed_server=false;
 string leave_room = "---Close Server---";
@@ -151,6 +152,7 @@ void *TCP_connection(void *parameter){
         }
         else if(strcmp(buffer, leave_room.c_str()) == 0){
             closed_server=true;
+            close(TCP_socket);
             break;
         }
         else{
@@ -179,7 +181,7 @@ int main(int argc, char *argv[]){
     pthread_attr_init(&attr);
     pthread_attr_init(&attru);
 
-    int TCP_socket = socket(AF_INET, SOCK_STREAM, 0);
+    TCP_socket = socket(AF_INET, SOCK_STREAM, 0);
     // Build up server information structure
     struct sockaddr_in server_info;
     bzero(&server_info, sizeof(server_info));
